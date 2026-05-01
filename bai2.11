@@ -1,0 +1,100 @@
+!pip install scikit-fuzzy
+
+import numpy as np
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
+
+distance = ctrl.Antecedent(np.arange(0, 51, 1), 'distance')  # km
+traffic = ctrl.Antecedent(np.arange(0, 101, 1), 'traffic')   # %
+demand = ctrl.Antecedent(np.arange(0, 101, 1), 'demand')
+weather = ctrl.Antecedent(np.arange(0, 101, 1), 'weather')
+rating = ctrl.Antecedent(np.arange(1, 6, 0.1), 'rating')
+punctuality = ctrl.Antecedent(np.arange(0, 101, 1), 'punctuality')
+
+price = ctrl.Consequent(np.arange(0, 101, 1), 'price')
+reward = ctrl.Consequent(np.arange(0, 101, 1), 'reward')
+
+# Distance
+distance['short'] = fuzz.trimf(distance.universe, [0, 0, 3])
+distance['medium'] = fuzz.trimf(distance.universe, [2, 5, 8])
+distance['long'] = fuzz.trimf(distance.universe, [6, 12, 20])
+distance['very_long'] = fuzz.trimf(distance.universe, [15, 30, 50])
+
+# Traffic
+traffic['low'] = fuzz.trimf(traffic.universe, [0, 0, 30])
+traffic['medium'] = fuzz.trimf(traffic.universe, [20, 50, 70])
+traffic['high'] = fuzz.trimf(traffic.universe, [60, 80, 100])
+
+# Demand
+demand['low'] = fuzz.trimf(demand.universe, [0, 0, 30])
+demand['medium'] = fuzz.trimf(demand.universe, [20, 50, 70])
+demand['high'] = fuzz.trimf(demand.universe, [60, 80, 100])
+
+# Weather
+weather['good'] = fuzz.trimf(weather.universe, [0, 0, 30])
+weather['moderate'] = fuzz.trimf(weather.universe, [20, 50, 70])
+weather['bad'] = fuzz.trimf(weather.universe, [60, 80, 100])
+
+# Rating
+rating['poor'] = fuzz.trimf(rating.universe, [1, 1, 2.5])
+rating['average'] = fuzz.trimf(rating.universe, [2, 3, 4])
+rating['good'] = fuzz.trimf(rating.universe, [3.5, 4.5, 5])
+
+# Punctuality
+punctuality['late'] = fuzz.trimf(punctuality.universe, [0, 0, 50])
+punctuality['on_time'] = fuzz.trimf(punctuality.universe, [40, 60, 80])
+punctuality['early'] = fuzz.trimf(punctuality.universe, [70, 90, 100])
+
+# Output Price
+price['low'] = fuzz.trimf(price.universe, [0, 0, 25])
+price['medium'] = fuzz.trimf(price.universe, [20, 40, 60])
+price['high'] = fuzz.trimf(price.universe, [50, 70, 85])
+price['very_high'] = fuzz.trimf(price.universe, [80, 90, 100])
+
+# Output Reward
+reward['none'] = fuzz.trimf(reward.universe, [0, 0, 25])
+reward['few'] = fuzz.trimf(reward.universe, [20, 40, 60])
+reward['moderate'] = fuzz.trimf(reward.universe, [50, 70, 85])
+reward['high'] = fuzz.trimf(reward.universe, [80, 90, 100])
+
+rules = [
+
+    # PRICE RULES
+    ctrl.Rule(distance['short'] & traffic['low'] & demand['low'], price['low']),
+    ctrl.Rule(distance['short'] & traffic['medium'] & demand['high'], price['medium']),
+    ctrl.Rule(distance['short'] & traffic['high'] & demand['high'], price['high']),
+    ctrl.Rule(distance['medium'] & traffic['low'] & weather['good'], price['medium']),
+    ctrl.Rule(distance['medium'] & traffic['medium'] & weather['good'], price['high']),
+    ctrl.Rule(distance['very_long'] & traffic['medium'] & weather['bad'], price['very_high']),
+    ctrl.Rule(distance['medium'] & traffic['high'] & weather['bad'], price['very_high']),
+    ctrl.Rule(distance['short'] & traffic['high'] & weather['bad'], price['high']),
+    ctrl.Rule(distance['very_long'] & weather['bad'], price['very_high']),
+    ctrl.Rule(distance['medium'] & traffic['medium'] & weather['moderate'], price['medium'])
+,
+    # REWARD RULES
+    ctrl.Rule(rating['good'] & punctuality['early'], reward['high']),
+    ctrl.Rule(rating['average'] & punctuality['on_time'], reward['moderate']),
+    ctrl.Rule(rating['poor'] & punctuality['late'], reward['none']),
+    ctrl.Rule(distance['long'] & traffic['high'] & punctuality['on_time'], reward['moderate']),
+    ctrl.Rule(distance['medium'] & traffic['medium'] & rating['good'], reward['moderate']),
+    ctrl.Rule(distance['very_long'] & weather['bad'] & rating['good'], reward['high']),
+    ctrl.Rule(distance['short'] & rating['average'] & punctuality['on_time'], reward['few']),
+    ctrl.Rule(distance['long'] & traffic['high'] & punctuality['late'], reward['few']),
+    ctrl.Rule(distance['medium'] & weather['moderate'] & rating['good'], reward['moderate'])
+]
+
+system = ctrl.ControlSystem(rules)
+sim = ctrl.ControlSystemSimulation(system)
+
+sim.input['distance'] = 2 # Changed from 10 to 2 to activate 'distance['short']'
+sim.input['traffic'] = 80
+sim.input['demand'] = 70 # Changed from 60 to 70 to activate demand['high']
+sim.input['weather'] = 40
+sim.input['rating'] = 4.5
+sim.input['punctuality'] = 75
+
+
+sim.compute()
+
+print("Giá dự đoán:", sim.output['price'])
+print("Điểm thưởng:", sim.output['reward'])
