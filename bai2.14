@@ -1,0 +1,84 @@
+!pip install scikit-fuzzy
+
+import numpy as np
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
+
+density = ctrl.Antecedent(np.arange(0, 101, 1), 'density')
+urgency = ctrl.Antecedent(np.arange(0, 101, 1), 'urgency')
+load = ctrl.Antecedent(np.arange(0, 101, 1), 'load')
+traffic = ctrl.Antecedent(np.arange(0, 101, 1), 'traffic')
+profit = ctrl.Antecedent(np.arange(0, 101, 1), 'profit')
+
+combine = ctrl.Consequent(np.arange(0, 11, 1), 'combine')
+priority = ctrl.Consequent(np.arange(0, 101, 1), 'priority')
+
+# Density
+density['low'] = fuzz.trimf(density.universe, [0, 0, 30])
+density['medium'] = fuzz.trimf(density.universe, [20, 50, 70])
+density['high'] = fuzz.trimf(density.universe, [60, 80, 100])
+
+# Urgency
+urgency['low'] = fuzz.trimf(urgency.universe, [0, 0, 30])
+urgency['medium'] = fuzz.trimf(urgency.universe, [20, 50, 70])
+urgency['high'] = fuzz.trimf(urgency.universe, [60, 80, 100])
+
+# Load
+load['low'] = fuzz.trimf(load.universe, [0, 0, 30])
+load['medium'] = fuzz.trimf(load.universe, [20, 50, 70])
+load['high'] = fuzz.trimf(load.universe, [60, 80, 100])
+
+# Traffic
+traffic['low'] = fuzz.trimf(traffic.universe, [0, 0, 30])
+traffic['medium'] = fuzz.trimf(traffic.universe, [20, 50, 70])
+traffic['high'] = fuzz.trimf(traffic.universe, [60, 80, 100])
+
+# Profit
+profit['low'] = fuzz.trimf(profit.universe, [0, 0, 30])
+profit['medium'] = fuzz.trimf(profit.universe, [20, 50, 70])
+profit['high'] = fuzz.trimf(profit.universe, [60, 80, 100])
+
+# OUTPUT: Combine
+combine['few'] = fuzz.trimf(combine.universe, [0, 1, 3])
+combine['some'] = fuzz.trimf(combine.universe, [2, 4, 6])
+combine['many'] = fuzz.trimf(combine.universe, [5, 7, 10])
+
+# OUTPUT: Priority
+priority['low'] = fuzz.trimf(priority.universe, [0, 0, 30])
+priority['medium'] = fuzz.trimf(priority.universe, [20, 50, 70])
+priority['high'] = fuzz.trimf(priority.universe, [60, 80, 100])
+
+rules = [
+
+    # ===== COMBINE =====
+    ctrl.Rule(density['high'] & load['low'] & traffic['low'], combine['many']),
+    ctrl.Rule(density['medium'] & traffic['high'] & urgency['medium'], combine['some']),
+    ctrl.Rule(load['high'] & density['high'] & profit['medium'], combine['some']),
+    ctrl.Rule(density['low'] & urgency['high'] & traffic['medium'], combine['some']),
+    ctrl.Rule(profit['high'] & urgency['high'] & traffic['high'], combine['some']),
+
+    # 👉 fallback để luôn có combine
+    ctrl.Rule(density['medium'], combine['some']),
+
+    # ===== PRIORITY =====
+    ctrl.Rule(urgency['high'] & profit['high'], priority['high']),
+    ctrl.Rule(urgency['medium'] & traffic['medium'], priority['medium']),
+    ctrl.Rule(urgency['low'] & density['high'] & profit['low'], priority['low']),
+
+    # 👉 fallback để tránh lỗi KeyError
+    ctrl.Rule(urgency['medium'], priority['medium'])
+]
+
+system = ctrl.ControlSystem(rules)
+sim = ctrl.ControlSystemSimulation(system)
+
+sim.input['density'] = 85     # cao
+sim.input['urgency'] = 50     # trung bình
+sim.input['load'] = 20        # thấp
+sim.input['traffic'] = 50     # trung bình
+sim.input['profit'] = 50      # trung bình
+
+sim.compute()
+
+print("Số đơn nên ghép:", sim.output.get('combine', 'Không có'))
+print("Mức độ ưu tiên:", sim.output.get('priority', 'Không có'))
